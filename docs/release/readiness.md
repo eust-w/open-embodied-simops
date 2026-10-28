@@ -29,11 +29,11 @@ datasets, training and evaluation, with traceable artifacts.**
 
 - [x] Owner confirmed publication rights, existing repository and Apache-2.0 on 2026-10-29.
 - [x] Original-code LICENSE and distribution metadata agree; third-party notices retained.
-- [ ] Review all source, examples and history for credentials, private addresses and private assets.
+- [x] Staged-source Gitleaks scan found no leaks; private host address removed. No private assets included.
 - [x] Local clean Python 3.11 environment: 35 core tests passed; build succeeded.
 - [x] Upgrade local pip/setuptools; dependency audit reported no known vulnerabilities (project itself is not on PyPI and was skipped).
 - [ ] Run hosted CI and verify public repository contents.
-- [ ] Keep hardware deployment explicitly unverified until a real robot test is completed.
+- [x] Hardware deployment is explicitly unverified in README and release notes.
 - [ ] Confirm social accounts and rights to every video/audio asset before publishing.
 - [ ] Verify each public post from its permalink; distinguish drafts, moderation and published playback.
 

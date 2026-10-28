@@ -14,7 +14,14 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install --upgrade pip setuptools
-      - run: python -m pip install -e '.[dev]' build pip-audit
+      - run: python -m pip install -e '.[dev]' build
       - run: python -m pytest
       - run: python -m build
-      - run: python -m pip_audit
+      - run: python -m pip freeze --exclude-editable > audit-requirements.txt
+      # Audit the exact tested dependency set with a supported auditor runtime.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m venv .audit-venv
+      - run: .audit-venv/bin/python -m pip install --upgrade pip setuptools pip-audit
+      - run: .audit-venv/bin/python -m pip_audit --no-deps --disable-pip -r audit-requirements.txt

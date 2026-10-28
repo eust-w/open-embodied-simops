@@ -23,8 +23,8 @@ or authorization. Do not expose the API, bridge, or noVNC ports to the Internet.
 ## Reporting
 
 Do not publish vulnerabilities, credentials, private addresses, or exploit
-payloads in public issues. The maintainer must enable GitHub private vulnerability
-reporting and verify its availability before public release. Until a private
-channel is established, do not attach sensitive details to an issue.
+payloads in public issues. GitHub private vulnerability reporting is enabled:
+[Report privately](https://github.com/eust-w/open-embodied-simops/security/advisories/new).
+Do not attach sensitive details to a public issue.
 
 No security audit or production-hardening claim is made for this Alpha.
