@@ -1,0 +1,208 @@
+schema_version: simops/v1
+name: mvp-robocasa-lerobot-kitchen-drawer
+runtime:
+  max_parallel_jobs: 1
+
+components:
+  genesis_world:
+    kind: simulator
+    source:
+      uri: https://github.com/Genesis-Embodied-AI/genesis-world
+      version: "main-2026-06-08"
+      license: Apache-2.0
+  robocasa:
+    kind: kitchen_scene_task_benchmark
+    source:
+      uri: https://github.com/robocasa/robocasa
+      version: "1.0.1"
+      license: MIT-code-CC-BY-4.0-assets-datasets
+  maniskill:
+    kind: simulation_data_collection
+    source:
+      uri: https://github.com/haosulab/ManiSkill
+      version: "3.0.1"
+      license: Apache-2.0
+  lerobot:
+    kind: dataset_training_deployment
+    source:
+      uri: https://github.com/huggingface/lerobot
+      version: "main-2026-06-08"
+      license: Apache-2.0
+
+pipeline:
+  - id: check_runtime
+    adapter: dependency_check
+    uses: [genesis_world, robocasa, maniskill, lerobot]
+    executables:
+      - python
+      - lerobot-train
+      - lerobot-eval
+      - lerobot-record
+    python_modules:
+      - genesis
+      - robocasa
+      - mani_skill
+      - lerobot
+    env_vars:
+      - SIMOPS_ROBOCASA_REPO
+      - SIMOPS_ROBOCASA_RAW_HDF5
+      - SIMOPS_LEROBOT_DATASET_REPO
+      - SIMOPS_TRAIN_STEPS
+      - SIMOPS_BATCH_SIZE
+
+  - id: prepare_robocasa_assets
+    adapter: command
+    uses: [robocasa]
+    command:
+      - python
+      - -c
+      - |
+        import json, runpy
+        from pathlib import Path
+        runpy.run_module("robocasa.scripts.setup_macros", run_name="__main__")
+        runpy.run_module("robocasa.scripts.download_kitchen_assets", run_name="__main__")
+        Path("robocasa").mkdir(exist_ok=True)
+        Path("robocasa/kitchen_assets_ready.json").write_text(
+            json.dumps({"source": "robocasa.scripts.download_kitchen_assets"}, indent=2),
+            encoding="utf-8",
+        )
+    outputs:
+      - name: robocasa_kitchen_assets_manifest
+        path: robocasa/kitchen_assets_ready.json
+        role: asset_manifest
+
+  - id: collect_or_import_kitchen_demonstrations
+    adapter: command
+    uses: [robocasa]
+    command:
+      - python
+      - -c
+      - |
+        import os, shutil, subprocess, sys
+        from pathlib import Path
+        repo = Path(os.environ["SIMOPS_ROBOCASA_REPO"])
+        subprocess.run(
+            [
+                sys.executable,
+                str(repo / "robocasa/scripts/collect_demos.py"),
+                "--env",
+                "robocasa/PickPlaceDrawerToCounter",
+            ],
+            check=True,
+        )
+        raw_hdf5 = Path(os.environ["SIMOPS_ROBOCASA_RAW_HDF5"])
+        if not raw_hdf5.exists():
+            raise SystemExit(f"RoboCasa raw HDF5 not found: {raw_hdf5}")
+        Path("datasets/raw").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(raw_hdf5, "datasets/raw/trajectory.hdf5")
+    outputs:
+      - name: robocasa_raw_hdf5
+        path: datasets/raw/trajectory.hdf5
+        role: trajectory_dataset
+
+  - id: convert_to_lerobot_dataset
+    adapter: command
+    uses: [robocasa, lerobot]
+    command:
+      - python
+      - ${env:SIMOPS_ROBOCASA_REPO}/robocasa/scripts/dataset_scripts/convert_hdf5_lerobot.py
+      - --raw_dataset_path
+      - ${artifacts.robocasa_raw_hdf5.path}
+    outputs:
+      - name: lerobot_dataset
+        path: datasets/raw/lerobot
+        role: lerobot_dataset
+
+  - id: train_act_policy
+    adapter: command
+    uses: [lerobot]
+    timeout_seconds: 172800
+    command:
+      - lerobot-train
+      - --policy.type=act
+      - --dataset.repo_id=${env:SIMOPS_LEROBOT_DATASET_REPO}
+      - --policy.device=cuda
+      - --steps=${env:SIMOPS_TRAIN_STEPS}
+      - --batch_size=${env:SIMOPS_BATCH_SIZE}
+      - --output_dir=${run_dir}/training/act
+      - --job_name=mvp_drawer_act
+    outputs:
+      - name: act_policy
+        path: training/act/checkpoints/last/pretrained_model
+        role: model
+
+  - id: evaluate_policy_in_sim
+    adapter: command
+    uses: [lerobot]
+    command:
+      - lerobot-eval
+      - --policy.path=${artifacts.act_policy.path}
+      - --policy.device=cuda
+      - --output_dir=${run_dir}/evaluation/act
+    outputs:
+      - name: sim_eval_metrics
+        path: evaluation/act/metrics.json
+        role: evaluation_report
+
+  - id: export_deployment_interfaces
+    adapter: deployment_export
+    uses: [lerobot]
+    policy_artifact: act_policy
+    output_dir: deployment
+    ros2:
+      package: simops_policy_bridge
+      node: policy_rollout_node
+      observation_topic: /simops/observations
+      action_topic: /simops/actions
+    lerobot:
+      robot_type: so100_follower
+      policy_type: act
+      task: open drawer and place object on counter
+      duration_seconds: 30
+      robot_port: $SIMOPS_ROBOT_PORT
+    outputs:
+      - name: ros2_rollout_node
+        path: deployment/ros2/policy_rollout_node.py
+        role: deployment_interface
+      - name: lerobot_rollout
+        path: deployment/lerobot/rollout.py
+        role: deployment_interface
+
+stack:
+  simulator:
+    component: genesis_world
+    secondary_components: [maniskill]
+  robot:
+    name: panda
+    embodiment: single_arm
+  scene:
+    generator: robocasa
+    kind: kitchen
+  assets:
+    - component: robocasa
+      categories: [kitchen, drawer, cup, counter]
+  task:
+    id: PickPlaceDrawerToCounter
+    language: open the drawer, pick the object, and place it on the counter
+  sensors:
+    cameras:
+      - name: wrist
+        width: 640
+        height: 480
+      - name: front
+        width: 640
+        height: 480
+    proprioception: true
+  randomization:
+    seed: 20260608
+    domains: [scene_layout, object_pose, camera_pose, lighting]
+  data_format:
+    name: lerobot
+    compatible_with: [robomimic]
+  training_strategy:
+    policy: act
+    alternatives: [diffusion, smolvla]
+    device: cuda
+  deployment_targets:
+    - ros2
+    - lerobot_rollout

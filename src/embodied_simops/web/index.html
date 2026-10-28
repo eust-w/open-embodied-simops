@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Embodied SimOps</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260609-pages19-live" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="流水线">
+        <div class="brand">
+          <span class="brand-mark">OS</span>
+          <div>
+            <strong>Open Embodied SimOps</strong>
+            <small id="healthText">检查中</small>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="#generate" data-page-link="generate" data-i18n="navGenerate">场景/资产生成</a>
+          <a href="#assets" data-page-link="assets" data-i18n="navAssets">场景/资产管理</a>
+          <a href="#simulate" data-page-link="simulate" data-i18n="navSimulation">仿真控制台</a>
+          <a href="#datasets" data-page-link="datasets" data-i18n="navDatasets">数据集</a>
+          <a href="#training" data-page-link="training" data-i18n="navTraining">训练</a>
+          <a href="#deployment" data-page-link="deployment" data-i18n="navDeployment">部署</a>
+        </nav>
+        <div class="language-switch" aria-label="语言">
+          <button type="button" class="active" data-lang="zh">中文</button>
+          <button type="button" data-lang="en">English</button>
+        </div>
+        <div class="runtime">
+          <label>
+            <span data-i18n="stateDir">状态目录</span>
+            <input id="stateDir" value=".simops" />
+          </label>
+          <button id="refreshButton" type="button" data-i18n="refresh">刷新</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section id="generate" class="page active-page">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h1 data-i18n="generateWorkbenchTitle">生成工作台</h1>
+                <p id="generationStatus" data-i18n="generationReady">选择生成器后生成真实场景/资产产物</p>
+              </div>
+              <div class="actions">
+                <button id="generateSceneButton" type="button" data-i18n="generateScene">生成场景</button>
+                <button id="generateAssetButton" type="button" data-i18n="generateAsset">生成资产</button>
+                <button id="generatePackageButton" type="button" class="primary" data-i18n="generatePackage">生成场景资产包</button>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span data-i18n="generator">生成器</span>
+                <select id="sceneGenerator"></select>
+              </label>
+              <label>
+                <span data-i18n="generationName">生成名称</span>
+                <input id="generationName" value="ui-maniskill-tabletop-package" />
+              </label>
+              <label>
+                <span data-i18n="generationCount">生成数量</span>
+                <input id="generationCount" type="number" min="1" max="100" value="1" />
+              </label>
+              <label>
+                <span data-i18n="generationFormat">输出格式</span>
+                <select id="generationFormat">
+                  <option value="simops_manifest">SimOps manifest</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="generationJobs">生成记录</h2>
+                <p data-i18n="generationJobsSubtitle">每个生成产物都有来源、版本、license 和 hash</p>
+              </div>
+            </div>
+            <div id="generationJobList" class="artifact-list"></div>
+          </div>
+
+          <div class="panel stack-panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="taskConfigTitle">任务配置</h2>
+                <p id="configStatus">尚未生成配置</p>
+              </div>
+              <div class="actions">
+                <button id="generateConfigButton" type="button" data-i18n="generateConfig">生成配置</button>
+                <button id="validateButton" type="button" data-i18n="validate">校验</button>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span data-i18n="taskName">任务名称</span>
+                <input id="taskName" value="ui-maniskill-lerobot-pickcube" />
+              </label>
+              <label>
+                <span data-i18n="simulator">仿真器</span>
+                <select id="simulator"></select>
+              </label>
+              <label>
+                <span data-i18n="robot">机器人本体</span>
+                <select id="robot"></select>
+              </label>
+              <label>
+                <span data-i18n="scene">场景生成器</span>
+                <select id="scene"></select>
+              </label>
+              <label>
+                <span data-i18n="task">任务</span>
+                <select id="task"></select>
+              </label>
+              <label>
+                <span data-i18n="sensors">传感器</span>
+                <select id="sensorPreset"></select>
+              </label>
+              <label>
+                <span data-i18n="demoEpisodes">采集条数</span>
+                <input id="demoEpisodes" type="number" min="1" value="1" />
+              </label>
+              <label>
+                <span data-i18n="seed">随机种子</span>
+                <input id="seed" type="number" value="20260608" />
+              </label>
+            </div>
+
+            <div class="asset-row" id="assetChecks"></div>
+          </div>
+        </section>
+
+        <section id="assets" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h1 data-i18n="assetManageTitle">场景/资产管理</h1>
+                <p data-i18n="assetManageSubtitle">目录状态来自 API 注册表，未接入的开源组件会明确标记为未配置</p>
+              </div>
+            </div>
+            <div class="library-grid">
+              <div>
+                <h3 data-i18n="scenes">场景</h3>
+                <div id="sceneList" class="list"></div>
+              </div>
+              <div>
+                <h3 data-i18n="assets">资产</h3>
+                <div id="assetList" class="list"></div>
+              </div>
+              <div>
+                <h3 data-i18n="robots">机器人</h3>
+                <div id="robotList" class="list"></div>
+              </div>
+            </div>
+            <div class="panel-head subhead">
+              <div>
+                <h2 data-i18n="generatedPackages">真实生成包</h2>
+                <p data-i18n="generatedPackagesSubtitle">来自状态目录下 package_manifest.json 的场景和资产</p>
+              </div>
+            </div>
+            <div class="asset-preview-workbench">
+              <div id="generatedPackageList" class="artifact-list"></div>
+              <aside class="preview-side" aria-label="Generated asset 3D preview">
+                <div class="preview-toolbar">
+                  <div>
+                    <h3 data-i18n="online3dPreview">在线 3D 预览</h3>
+                    <small id="assetPreviewStatus">等待选择生成包</small>
+                  </div>
+                  <label class="fullscreen-control">
+                    <input id="assetPreviewFullscreenToggle" type="checkbox" />
+                    <span data-i18n="fullscreen">全屏</span>
+                  </label>
+                </div>
+                <div id="assetPreviewViewport" class="three-viewport" tabindex="0"></div>
+                <pre id="assetPreviewMeta" class="code-output preview-meta">未选择生成包</pre>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section id="simulate" class="page">
+          <div class="panel sim-panel">
+            <div class="panel-head">
+              <div>
+                <h1 data-i18n="simulationTitle">仿真控制台</h1>
+                <p id="teleopStatus">未启动会话</p>
+              </div>
+              <div class="actions">
+                <button id="startTeleopButton" type="button" data-i18n="createSimulationSession">创建仿真会话</button>
+                <button id="streamFrameButton" type="button" data-i18n="connectFrameStream">连接实时帧流</button>
+                <button id="nativeUiButton" type="button" data-i18n="openNativeUi">原生 UI</button>
+                <button id="closeTeleopButton" type="button" data-i18n="closeSimulationSession">关闭会话</button>
+                <button id="collectButton" type="button" data-i18n="collectTrajectories">采集轨迹</button>
+                <button id="runButton" type="button" class="primary" data-i18n="runPipeline">运行完整闭环</button>
+              </div>
+            </div>
+            <div class="sim-grid">
+              <div class="viewport" tabindex="0" id="simViewport" aria-label="仿真视窗" data-i18n-aria="simulationViewport">
+                <div class="viewport-tools">
+                  <div class="view-mode-buttons">
+                    <button id="simRenderViewButton" type="button" data-i18n="realRenderView">真实帧</button>
+                    <button id="simStateViewButton" type="button" data-i18n="state3dView">状态 3D</button>
+                    <button id="simPreviewButton" type="button" data-i18n="refresh3dPreview">刷新 3D 预览</button>
+                  </div>
+                  <label class="fullscreen-control">
+                    <input id="simFullscreenToggle" type="checkbox" />
+                    <span data-i18n="fullscreen">全屏</span>
+                  </label>
+                </div>
+                <div id="simThreeViewport" class="three-viewport sim-three" tabindex="0"></div>
+                <img id="simRenderFrameImage" class="sim-render-frame" alt="Simulation rendered frame" />
+              </div>
+              <aside class="sim-side">
+                <div class="teleop-pad">
+                  <button data-action="forward">↑</button>
+                  <button data-action="left">←</button>
+                  <button data-action="stop">■</button>
+                  <button data-action="right">→</button>
+                  <button data-action="backward">↓</button>
+                  <button data-action="gripper_open" data-i18n="openGripper">打开</button>
+                  <button data-action="gripper_close" data-i18n="closeGripper">闭合</button>
+                  <button data-action="lift" data-i18n="lift">抬升</button>
+                  <button data-action="lower" data-i18n="lower">下降</button>
+                </div>
+                <div id="simFramePanel" class="sim-frame-panel">
+                  <strong data-i18n="renderFrame">真实渲染帧</strong>
+                  <small id="simFrameStatus" data-i18n="renderFrameWaiting">等待会话帧</small>
+                </div>
+                <div id="simNativePanel" class="sim-native-panel">
+                  <strong data-i18n="nativeSimulatorUi">原生仿真器 UI</strong>
+                  <small id="simNativeStatus">未检测</small>
+                  <iframe id="simNativeFrame" title="Native simulator UI"></iframe>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="simulationApiTitle">仿真 API</h2>
+                <p id="simulationApiStatus">未配置</p>
+              </div>
+              <div class="actions">
+                <button id="latestFrameButton" type="button" data-i18n="latestFrame">读取最新画面</button>
+                <button id="playbackButton" type="button" data-i18n="createPlayback">创建回放</button>
+              </div>
+            </div>
+            <div id="simulationApiList" class="api-list"></div>
+            <pre id="simulationApiOutput" class="code-output">暂无 API 响应</pre>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="runtimeEnvironment">运行环境</h2>
+                <p id="runStatus">没有正在运行的任务</p>
+              </div>
+            </div>
+            <div id="runtimeStatusList" class="status-grid"></div>
+            <details class="env-box" open>
+              <summary data-i18n="runtimeOverrides">运行命令覆盖</summary>
+              <div class="form-grid compact">
+                <label>
+                  ManiSkill MP Python
+                  <input id="envManiskillPython" placeholder="/opt/open-embodied-simops/.maniskill-mp-venv/bin/python" />
+                </label>
+                <label>
+                  LeRobot Python
+                  <input id="envLerobotPython" placeholder="/opt/open-embodied-simops/.venv/bin/python" />
+                </label>
+                <label>
+                  LeRobot train
+                  <input id="envLerobotTrain" placeholder="/opt/open-embodied-simops/.venv/bin/lerobot-train" />
+                </label>
+                <label>
+                  LeRobot record
+                  <input id="envLerobotRecord" placeholder="/opt/open-embodied-simops/.venv/bin/lerobot-record" />
+                </label>
+                <label>
+                  MotrixSim Python
+                  <input id="envMotrixsimPython" placeholder="/opt/Motphys/MotrixLab/.venv/bin/python" />
+                </label>
+                <label>
+                  MotrixSim docs
+                  <input id="envMotrixsimDocs" placeholder="/opt/Motphys/motrixsim-docs" />
+                </label>
+                <label>
+                  MotrixSim home
+                  <input id="envMotrixsimHome" placeholder="/opt/Motphys/MotrixLab" />
+                </label>
+                <label>
+                  MotrixSim PYTHONPATH
+                  <input id="envMotrixsimPythonpath" placeholder="/opt/open-embodied-simops/src" />
+                </label>
+              </div>
+            </details>
+            <div class="panel-head subhead">
+              <div>
+                <h2 data-i18n="runtimeDependencies">平台依赖</h2>
+                <p id="dependencyStatus">等待检查</p>
+              </div>
+              <div class="actions">
+                <button id="installBridgeButton" type="button" data-i18n="startBridgeService">启动仿真桥接</button>
+              </div>
+            </div>
+            <div id="dependencyStatusList" class="status-grid"></div>
+          </div>
+        </section>
+
+        <section id="datasets" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h1 data-i18n="datasetsTitle">数据集</h1>
+                <p id="datasetStatus">未选择数据集</p>
+              </div>
+              <div class="actions">
+                <button id="mergeButton" type="button" data-i18n="mergeSelected">合并选中</button>
+              </div>
+            </div>
+            <div class="split dataset-workbench">
+              <div class="dataset-browser">
+                <h3 data-i18n="datasetArtifacts">数据集产物</h3>
+                <div id="datasetList" class="artifact-list"></div>
+              </div>
+              <aside class="dataset-inspector" aria-label="Dataset inspector">
+                <h3 data-i18n="conversionTarget">转换目标</h3>
+                <label>
+                  <span data-i18n="dataFormat">数据格式</span>
+                  <select id="dataFormat"></select>
+                </label>
+                <label>
+                  <span data-i18n="mergeOutputPath">合并输出路径</span>
+                  <input id="mergeOutput" value="/var/lib/open-embodied-simops/datasets/merged_lerobot" />
+                </label>
+                <h3 data-i18n="datasetPreview">数据集可视化</h3>
+                <div id="datasetInspectTitle" class="inspect-title">未选择数据集</div>
+                <div id="datasetPreview" class="preview-grid"></div>
+                <pre id="datasetDetail" class="code-output">未选择数据集</pre>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section id="training" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h1 data-i18n="trainingTitle">训练</h1>
+                <p data-i18n="trainingSubtitle">训练参数会写入任务配置，运行完整闭环时由目标机真实执行</p>
+              </div>
+              <div class="actions">
+                <button id="trainButton" type="button" class="primary" data-i18n="startTraining">启动真实训练闭环</button>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span data-i18n="policy">策略模型</span>
+                <select id="policyType"></select>
+              </label>
+              <label>
+                <span data-i18n="trainSteps">训练步数</span>
+                <input id="trainSteps" type="number" min="1" value="1" />
+              </label>
+              <label>
+                <span data-i18n="batchSize">批大小</span>
+                <input id="batchSize" type="number" min="1" value="1" />
+              </label>
+              <label>
+                <span data-i18n="datasetRepoId">数据集 repo id</span>
+                <input id="datasetRepo" value="simops/pickcube-real-ui" />
+              </label>
+              <label>
+                <span data-i18n="evalEpisodes">评测条数</span>
+                <input id="evalEpisodes" type="number" min="1" value="1" />
+              </label>
+              <label>
+                <span data-i18n="minSuccess">最低成功率</span>
+                <input id="minSuccess" type="number" min="0" max="1" step="0.01" value="0.00" />
+              </label>
+            </div>
+            <div class="panel-head subhead">
+              <div>
+                <h2 data-i18n="modelArtifacts">模型与训练产物</h2>
+                <p data-i18n="modelArtifactsSubtitle">来自真实训练运行目录和 provenance ledger</p>
+              </div>
+            </div>
+            <div id="modelList" class="artifact-list"></div>
+          </div>
+        </section>
+
+        <section id="deployment" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h1 data-i18n="deploymentTitle">部署</h1>
+                <p data-i18n="deploymentSubtitle">查看运行记录、阶段、产物和导出的 ROS 2 / LeRobot rollout 接口</p>
+              </div>
+            </div>
+            <div class="split">
+              <div>
+                <h3 data-i18n="runs">运行记录</h3>
+                <div id="runList" class="run-list"></div>
+                <h3 data-i18n="stages">阶段</h3>
+                <div id="stageList" class="stage-list"></div>
+              </div>
+              <div>
+                <h3 data-i18n="artifacts">产物</h3>
+                <div id="artifactList" class="artifact-list"></div>
+                <h3 data-i18n="deploymentInterfaces">部署接口</h3>
+                <div id="deploymentList" class="artifact-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script src="/static/app.js?v=20260609-pages19-live"></script>
+  </body>
+</html>

@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-embodied-simops"
+version = "0.1.0a1"
+description = "Private SimOps orchestration for embodied AI simulation, data, training, evaluation, and deployment loops."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+keywords = ["robotics", "simulation", "lerobot", "maniskill", "simops"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "fastapi>=0.110",
+  "pydantic>=2.6",
+  "pyyaml>=6.0",
+  "tomli>=2.0; python_version < '3.11'",
+  "typer>=0.12",
+  "uvicorn>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+simops = "embodied_simops.cli:app"
+
+[project.urls]
+Repository = "https://github.com/eust-w/open-embodied-simops"
+Issues = "https://github.com/eust-w/open-embodied-simops/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+embodied_simops = ["web/*", "web/vendor/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

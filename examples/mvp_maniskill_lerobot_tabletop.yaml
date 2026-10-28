@@ -1,0 +1,248 @@
+schema_version: simops/v1
+name: production-maniskill-lerobot-tabletop-pickcube
+runtime:
+  max_parallel_jobs: 1
+
+components:
+  maniskill:
+    kind: simulation_data_collection
+    source:
+      uri: https://github.com/haosulab/ManiSkill
+      version: "3.0.1"
+      license: Apache-2.0
+  lerobot:
+    kind: dataset_training_evaluation_deployment
+    source:
+      uri: https://github.com/huggingface/lerobot
+      version: "main-2026-06-08"
+      license: Apache-2.0
+
+pipeline:
+  - id: check_runtime
+    adapter: dependency_check
+    uses: [maniskill, lerobot]
+    executables:
+      - ${env:SIMOPS_MANISKILL_MP_PYTHON}
+      - ${env:SIMOPS_LEROBOT_PYTHON}
+      - ${env:SIMOPS_LEROBOT_TRAIN}
+      - ${env:SIMOPS_LEROBOT_RECORD}
+    env_vars:
+      - SIMOPS_MANISKILL_MP_PYTHON
+      - SIMOPS_LEROBOT_PYTHON
+      - SIMOPS_LEROBOT_TRAIN
+      - SIMOPS_LEROBOT_RECORD
+      - SIMOPS_POLICY_TYPE
+      - SIMOPS_DEMO_EPISODES
+      - SIMOPS_LEROBOT_DATASET_REPO
+      - SIMOPS_TRAIN_STEPS
+      - SIMOPS_BATCH_SIZE
+      - SIMOPS_EVAL_EPISODES
+      - SIMOPS_EVAL_MAX_STEPS
+      - SIMOPS_MIN_SUCCESS_RATE
+
+  - id: collect_motionplanned_tabletop_data
+    adapter: command
+    uses: [maniskill]
+    command:
+      - ${env:SIMOPS_MANISKILL_MP_PYTHON}
+      - -m
+      - mani_skill.examples.motionplanning.panda.run
+      - -e
+      - PickCube-v1
+      - -n
+      - ${env:SIMOPS_DEMO_EPISODES}
+      - -o
+      - state_dict
+      - --only-count-success
+      - -b
+      - cpu
+      - --record-dir
+      - ${run_dir}/maniskill
+      - --traj-name
+      - trajectory
+    outputs:
+      - name: maniskill_trajectory_h5
+        path: maniskill/PickCube-v1/motionplanning/trajectory.h5
+        role: trajectory_dataset
+      - name: maniskill_trajectory_json
+        path: maniskill/PickCube-v1/motionplanning/trajectory.json
+        role: trajectory_metadata
+
+  - id: convert_to_lerobot_dataset
+    adapter: command
+    uses: [maniskill, lerobot]
+    command:
+      - ${env:SIMOPS_LEROBOT_PYTHON}
+      - -m
+      - mani_skill.trajectory.convert_to_lerobot
+      - --traj-path
+      - ${artifacts.maniskill_trajectory_h5.path}
+      - --output-dir
+      - ${run_dir}/datasets/lerobot_pickcube
+      - --task-name
+      - Pick up the cube and move it to the goal
+      - --fps
+      - "30"
+      - --image-size
+      - 128x128
+      - --robot-type
+      - panda
+    outputs:
+      - name: lerobot_raw_dataset
+        path: datasets/lerobot_pickcube
+        role: lerobot_dataset
+
+  - id: add_task_environment_state
+    adapter: command
+    uses: [maniskill, lerobot]
+    command:
+      - ${env:SIMOPS_LEROBOT_PYTHON}
+      - -m
+      - embodied_simops.integrations.maniskill_lerobot
+      - add-environment-state
+      - --dataset-root
+      - ${artifacts.lerobot_raw_dataset.path}
+      - --trajectory-h5
+      - ${artifacts.maniskill_trajectory_h5.path}
+      - --output-root
+      - ${run_dir}/datasets/lerobot_pickcube_act
+    outputs:
+      - name: lerobot_act_dataset
+        path: datasets/lerobot_pickcube_act
+        role: lerobot_dataset
+
+  - id: train_policy
+    adapter: command
+    uses: [lerobot]
+    timeout_seconds: 172800
+    command:
+      - ${env:SIMOPS_LEROBOT_TRAIN}
+      - --policy.type=${env:SIMOPS_POLICY_TYPE}
+      - --dataset.repo_id=${env:SIMOPS_LEROBOT_DATASET_REPO}
+      - --dataset.root=${artifacts.lerobot_act_dataset.path}
+      - --policy.device=cuda
+      - --policy.push_to_hub=false
+      - --steps=${env:SIMOPS_TRAIN_STEPS}
+      - --batch_size=${env:SIMOPS_BATCH_SIZE}
+      - --num_workers=0
+      - --eval_freq=0
+      - --log_freq=100
+      - --save_checkpoint=true
+      - --save_freq=${env:SIMOPS_TRAIN_STEPS}
+      - --wandb.enable=false
+      - --output_dir=${run_dir}/training/policy
+      - --job_name=production_pickcube_policy
+    outputs:
+      - name: policy_training_run
+        path: training/policy
+        role: training_run
+
+  - id: select_final_policy
+    adapter: command
+    uses: [lerobot]
+    command:
+      - ${env:SIMOPS_LEROBOT_PYTHON}
+      - -m
+      - embodied_simops.integrations.maniskill_lerobot
+      - select-latest-policy
+      - --training-dir
+      - ${artifacts.policy_training_run.path}
+      - --output-dir
+      - ${run_dir}/training/final_policy
+      - --manifest-path
+      - ${run_dir}/training/final_policy_manifest.json
+    outputs:
+      - name: trained_policy
+        path: training/final_policy
+        role: model
+      - name: trained_policy_manifest
+        path: training/final_policy_manifest.json
+        role: model_manifest
+
+  - id: evaluate_policy_in_sim
+    adapter: command
+    uses: [maniskill, lerobot]
+    command:
+      - ${env:SIMOPS_LEROBOT_PYTHON}
+      - -m
+      - embodied_simops.integrations.maniskill_lerobot
+      - evaluate-policy
+      - --policy-type
+      - ${env:SIMOPS_POLICY_TYPE}
+      - --policy-path
+      - ${artifacts.trained_policy.path}
+      - --metrics-path
+      - ${run_dir}/evaluation/policy/metrics.json
+      - --episodes
+      - ${env:SIMOPS_EVAL_EPISODES}
+      - --max-steps
+      - ${env:SIMOPS_EVAL_MAX_STEPS}
+      - --min-success-rate
+      - ${env:SIMOPS_MIN_SUCCESS_RATE}
+      - --seed
+      - "20260608"
+      - --trajectory-h5
+      - ${artifacts.maniskill_trajectory_h5.path}
+    outputs:
+      - name: sim_eval_metrics
+        path: evaluation/policy/metrics.json
+        role: evaluation_report
+
+  - id: export_deployment_interfaces
+    adapter: deployment_export
+    uses: [lerobot]
+    policy_artifact: trained_policy
+    output_dir: deployment
+    ros2:
+      package: simops_policy_bridge
+      node: policy_rollout_node
+      observation_topic: /simops/observations
+      action_topic: /simops/actions
+    lerobot:
+      robot_type: so100_follower
+      policy_type: ${env:SIMOPS_POLICY_TYPE}
+      task: pick up the cube and move it to the goal
+      duration_seconds: 30
+      robot_port: $SIMOPS_ROBOT_PORT
+    outputs:
+      - name: ros2_rollout_node
+        path: deployment/ros2/policy_rollout_node.py
+        role: deployment_interface
+      - name: lerobot_rollout
+        path: deployment/lerobot/rollout.py
+        role: deployment_interface
+
+stack:
+  simulator:
+    component: maniskill
+  robot:
+    name: panda
+    embodiment: single_arm
+  scene:
+    generator: maniskill
+    kind: tabletop
+  assets:
+    - component: maniskill
+      categories: [cube, tabletop, goal]
+  task:
+    id: PickCube-v1
+    language: pick up the cube and move it to the goal
+  sensors:
+    cameras:
+      - name: base_camera
+        width: 640
+        height: 480
+    proprioception: true
+  randomization:
+    seed: 20260608
+    domains: [object_pose, camera_pose]
+  data_format:
+    name: lerobot
+    compatible_with: [robomimic]
+  training_strategy:
+    policy: configurable
+    alternatives: [act, diffusion, smolvla]
+    device: cuda
+  deployment_targets:
+    - ros2
+    - lerobot_rollout
