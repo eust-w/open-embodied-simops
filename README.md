@@ -10,6 +10,10 @@
 **状态：Alpha，Apache-2.0。** 适合开发者参与和复现，尚非开箱即用的完整机器人生产平台。
 API 只应运行在可信本地环境，不要直接暴露到公网。
 
+![实际本地工作台](docs/assets/workbench.jpg)
+
+实际空工作台截图，非 GPU 运行证明。查看 [64 秒双语介绍与下载](https://github.com/eust-w/open-embodied-simops/releases/tag/v0.1.0-alpha.1)。
+
 ## 工作流
 
 ```text

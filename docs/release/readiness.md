@@ -32,7 +32,8 @@ datasets, training and evaluation, with traceable artifacts.**
 - [x] Staged-source Gitleaks scan found no leaks; private host address removed. No private assets included.
 - [x] Local clean Python 3.11 environment: 35 core tests passed; build succeeded.
 - [x] Upgrade local pip/setuptools; dependency audit reported no known vulnerabilities (project itself is not on PyPI and was skipped).
-- [ ] Run hosted CI and verify public repository contents.
+- [x] Repository is public, Apache-2.0 detected, private vulnerability reporting enabled.
+- [x] Hosted Python 3.10/3.11 tests, builds and audits passed on commit `fbdab43` (run `40764189932`).
 - [x] Hardware deployment is explicitly unverified in README and release notes.
 - [ ] Confirm social accounts and rights to every video/audio asset before publishing.
 - [ ] Verify each public post from its permalink; distinguish drafts, moderation and published playback.

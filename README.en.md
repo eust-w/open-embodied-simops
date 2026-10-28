@@ -9,6 +9,10 @@ evaluation through traceable local workflows.**
 This is orchestration around existing engines, not a new physics engine or a
 finished robot operations platform. Run it only in a trusted local environment.
 
+![Actual local workbench](docs/assets/workbench.jpg)
+
+Actual empty local UI, not evidence of a GPU run. [64-second introduction and downloads](https://github.com/eust-w/open-embodied-simops/releases/tag/v0.1.0-alpha.1).
+
 ```text
 Scene + assets + robot + task + sensors + randomization
                           |
